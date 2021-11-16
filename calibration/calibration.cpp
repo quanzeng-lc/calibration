@@ -1,5 +1,6 @@
 ﻿#include <iostream>
 #include <Eigen/Dense>
+#include <Eigen/Eigen>
 using namespace Eigen;
 using namespace std;
 
