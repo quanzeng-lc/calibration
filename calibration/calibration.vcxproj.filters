@@ -18,5 +18,22 @@
     <ClCompile Include="calibration.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="caliData.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="calculation.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="caliData.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="calculation.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
