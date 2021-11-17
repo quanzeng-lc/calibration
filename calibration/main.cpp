@@ -10,7 +10,7 @@ int main()
     Eigen::MatrixXd ndiData = testData.getNDIData();
 
     calculation testCal;
-    auto testShow = testCal.calculateRbo(ndiData, 5);
+    auto testShow = testCal.calculateReo(ndiData, 1 ,5);
     std::cout << testShow << std::endl;
 
     system("pause");
