@@ -10,7 +10,6 @@ Eigen::Matrix3d calculation::calculateRbo(Eigen::MatrixXd ndiData, int numOffset
 {
     Eigen::Vector3d init = ndiData(0, Eigen::seq(4,6));
 
-    Eigen::Matrix3d Rbo = Eigen::Matrix3d::Zero();
     Eigen::Vector3d Rbo_x = Eigen::Vector3d::Zero();
     Eigen::Vector3d Rbo_y = Eigen::Vector3d::Zero();
     Eigen::Vector3d Rbo_z = Eigen::Vector3d::Zero();
@@ -39,9 +38,9 @@ Eigen::Matrix3d calculation::calculateRbo(Eigen::MatrixXd ndiData, int numOffset
     }
     Rbo_z = Rbo_z / numOffset;
 
-    Rbo = { {Rbo_x(0),Rbo_y(0),Rbo_z(0)},
-            {Rbo_x(1),Rbo_y(1),Rbo_z(1)},
-            {Rbo_x(2),Rbo_y(2),Rbo_z(2)} };
+    Eigen::Matrix3d Rbo({ {Rbo_x(0), Rbo_y(0), Rbo_z(0)},
+                          {Rbo_x(1), Rbo_y(1), Rbo_z(1)},
+                          {Rbo_x(2), Rbo_y(2), Rbo_z(2)} });
 
     return Rbo;
 }
@@ -50,7 +49,6 @@ Eigen::Matrix3d calculation::calculateOnceReo(Eigen::MatrixXd ndiData, int numOf
 {
     Eigen::Vector3d init = ndiData(0, Eigen::seq(4, 6));
 
-    Eigen::Matrix3d Reo = Eigen::Matrix3d::Zero();
     Eigen::Vector3d Reo_x = Eigen::Vector3d::Zero();
     Eigen::Vector3d Reo_y = Eigen::Vector3d::Zero();
     Eigen::Vector3d Reo_z = Eigen::Vector3d::Zero();
@@ -79,9 +77,9 @@ Eigen::Matrix3d calculation::calculateOnceReo(Eigen::MatrixXd ndiData, int numOf
     }
     Reo_z = Reo_z / numOffset;
 
-    Reo = { {Reo_x(0),Reo_y(0),Reo_z(0)},
-            {Reo_x(1),Reo_y(1),Reo_z(1)},
-            {Reo_x(2),Reo_y(2),Reo_z(2)} };
+    Eigen::Matrix3d Reo({ {Reo_x(0), Reo_y(0), Reo_z(0)},
+                          {Reo_x(1), Reo_y(1), Reo_z(1)},
+                          {Reo_x(2), Reo_y(2), Reo_z(2)} });
 
     return Reo;
 }
