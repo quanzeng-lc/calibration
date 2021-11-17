@@ -10,11 +10,15 @@ class caliData
 {
 public:
     caliData();
-    void readNDIData(std::string filename);
-    Eigen::MatrixXd getNDIData();
+    void readNDIData(std::string filename, Eigen::MatrixXd& matrix);
+
+    void readMatrixB(std::string filename);
+    void readMatrixE(std::string filename);
+    Eigen::MatrixXd getMatrixB();
+    Eigen::MatrixXd getMatrixE();
 
 private:
     
-    int numMarkers_ = 0;
-    Eigen::MatrixXd NDIData_;
+    Eigen::MatrixXd MatrixB_;
+    Eigen::MatrixXd MatrixE_;
 };
