@@ -1,12 +1,12 @@
 #include "calculation.h"
 
-calculation::calculation()
+calculation::calculation(int numInit)
 {
-
+    this->numInit_ = numInit;
 }
 
 
-Eigen::Matrix3d calculation::calculateRbo(Eigen::MatrixXd ndiData, int numOffset)
+void calculation::calculateRbo(Eigen::MatrixXd ndiData, int numOffset)
 {
     Eigen::Vector3d init = ndiData(0, Eigen::seq(4,6));
 
@@ -42,7 +42,7 @@ Eigen::Matrix3d calculation::calculateRbo(Eigen::MatrixXd ndiData, int numOffset
                           {Rbo_x(1), Rbo_y(1), Rbo_z(1)},
                           {Rbo_x(2), Rbo_y(2), Rbo_z(2)} });
 
-    return Rbo;
+    Rbo_ = Rbo;
 }
 
 Eigen::Matrix3d calculation::calculateOnceReo(Eigen::MatrixXd ndiData, int numOffset)
@@ -84,12 +84,12 @@ Eigen::Matrix3d calculation::calculateOnceReo(Eigen::MatrixXd ndiData, int numOf
     return Reo;
 }
 //
-Eigen::MatrixXd calculation::calculateReo(Eigen::MatrixXd ndiData, int numInit, int numOffset)
+void calculation::calculateReo(Eigen::MatrixXd ndiData, int numOffset)
 {
     Eigen::MatrixXd Reo(0, 3);
     Eigen::Matrix3d ReoInitPos = Eigen::Matrix3d::Zero();
 
-    for (int i = 0; i < numInit; i++)
+    for (int i = 0; i < this->numInit_; i++)
     {
         ReoInitPos = this->calculateOnceReo(    \
             ndiData(Eigen::seq(i * 3 * numOffset, (i + 1) * 3 * numOffset), Eigen::all), \
@@ -99,5 +99,71 @@ Eigen::MatrixXd calculation::calculateReo(Eigen::MatrixXd ndiData, int numInit, 
         Reo.block(3 * i, 0, 3, 3) = ReoInitPos;
     }
 
-    return Reo;
+    Reo_ = Reo;
 }
+
+void calculation::setRtpTtp(Eigen::Matrix3d Rtp, Eigen::Vector3d Ttp)
+{
+    this->Rtp_ = Rtp;
+    this->Ttp_ = Ttp;
+}
+
+void calculation::setRpoTpo(Eigen::MatrixXd Rpo, Eigen::MatrixXd Tpo)
+{
+    this->Rpo_ = Rpo;
+    this->Tpo_ = Tpo;
+}
+
+void calculation::setRtoTto(Eigen::MatrixXd Rto, Eigen::MatrixXd Tto)
+{
+    this->Rto_ = Rto;
+    this->Tto_ = Tto;
+}
+
+void calculation::calculateOnceRpoTpo(int initPos, Eigen::Matrix3d& Rpo, Eigen::Vector3d& Tpo)
+{
+    Eigen::Matrix3d Rto = this->Rto_.block(initPos * 3, 0, 3, 3);
+    Rpo = Rto * this->Rtp_.inverse();
+
+    Eigen::Vector3d Tto = this->Tto_.block(initPos, 0, 1, 3);
+    Tpo = -Rpo * this->Ttp_ + Tto;
+}
+
+void calculation::calculateRpoTpo()
+{
+    Eigen::MatrixXd Rpo(0, 3);
+    Eigen::MatrixXd Tpo(0, 3);
+    Eigen::Matrix3d RpoInitPos = Eigen::Matrix3d::Zero();
+    Eigen::Vector3d TpoInitPos = Eigen::Vector3d::Zero();
+
+    for (int i = 0; i < this->numInit_; i++)
+    {
+        this->calculateOnceRpoTpo(i, RpoInitPos, TpoInitPos);
+
+        Rpo.conservativeResize(Rpo.rows() + 3, Rpo.cols());
+        Rpo.block(3 * i, 0, 1, 3) = RpoInitPos;
+
+        Tpo.conservativeResize(Tpo.rows() + 1, Tpo.cols());
+        Tpo.block(i, 0, 1, 3) = TpoInitPos;
+    }
+    
+    Rpo_ = Rpo;
+    Tpo_ = Tpo;
+}
+
+void calculation::calculateRet()
+{
+    Eigen::Matrix3d Ret = Eigen::Matrix3d::Zero();
+    Eigen::Matrix3d Rpo = Eigen::Matrix3d::Zero();
+    Eigen::Matrix3d Reo = Eigen::Matrix3d::Zero();
+    for (int i = 0; i < this->numInit_; i++)
+    {
+        Rpo = Rpo_.block(3 * i, 0, 3, 3);
+        Reo = Reo_.block(3 * i, 0, 3, 3);
+
+        Ret += Rtp_.inverse() * Rpo.inverse() * Reo;
+    }
+
+    Ret_ = Ret / this->numInit_;
+}
+
