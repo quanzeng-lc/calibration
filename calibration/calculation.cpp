@@ -169,7 +169,7 @@ void calculation::calculateRet()
 
 void calculation::calculateRbe()
 {
-    Eigen::Matrix3d Rbe = Eigen::Matrix3d::Zero();
+    Eigen::MatrixXd Rbe(0,3);
     Eigen::Matrix3d RbeInitPos = Eigen::Matrix3d::Zero();
     Eigen::Matrix3d Reo = Eigen::Matrix3d::Zero();
     for (int i = 0; i < this->numInit_; i++)

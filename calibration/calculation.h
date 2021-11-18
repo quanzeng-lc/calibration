@@ -27,5 +27,5 @@ private:
     Eigen::MatrixXd Rto_;
     Eigen::MatrixXd Tto_;
     Eigen::Matrix3d Ret_;
-    Eigen::MatrixXd Rbe_
+    Eigen::MatrixXd Rbe_;
 };
