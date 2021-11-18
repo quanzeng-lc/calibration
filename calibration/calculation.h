@@ -14,6 +14,7 @@ public:
     void calculateOnceRpoTpo(int initPos, Eigen::Matrix3d& Rpo, Eigen::Vector3d& Tpo);
     void calculateRpoTpo();
     void calculateRet();
+    void calculateRbe();
 
 private:
     int numInit_ = 0;
@@ -26,4 +27,5 @@ private:
     Eigen::MatrixXd Rto_;
     Eigen::MatrixXd Tto_;
     Eigen::Matrix3d Ret_;
+    Eigen::MatrixXd Rbe_
 };

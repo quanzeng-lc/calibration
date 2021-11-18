@@ -83,7 +83,7 @@ Eigen::Matrix3d calculation::calculateOnceReo(Eigen::MatrixXd ndiData, int numOf
 
     return Reo;
 }
-//
+
 void calculation::calculateReo(Eigen::MatrixXd ndiData, int numOffset)
 {
     Eigen::MatrixXd Reo(0, 3);
@@ -165,5 +165,21 @@ void calculation::calculateRet()
     }
 
     Ret_ = Ret / this->numInit_;
+}
+
+void calculation::calculateRbe()
+{
+    Eigen::Matrix3d Rbe = Eigen::Matrix3d::Zero();
+    Eigen::Matrix3d RbeInitPos = Eigen::Matrix3d::Zero();
+    Eigen::Matrix3d Reo = Eigen::Matrix3d::Zero();
+    for (int i = 0; i < this->numInit_; i++)
+    {
+        Reo = Reo_.block(3 * i, 0, 3, 3);
+        RbeInitPos = Rbo_ * Reo.inverse();
+
+        Rbe.conservativeResize(Rbe.rows() + 3, Rbe.cols());
+        Rbe.block(3 * i, 0, 1, 3) = RbeInitPos;
+    }
+    Rbe_ = Rbe;
 }
 
