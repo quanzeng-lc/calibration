@@ -2,13 +2,17 @@
 
 #include "calculation.h"
 #include "caliData.h"
+#include <fstream>
+//#include <sstream>
+//#include <iostream>
+
 
 int main()
 {
     caliData classData;
-    classData.readMatrixB("..\\x64\\Debug\\calibration_data\\20211125\\BaseNDIData.csv");
-	classData.readMatrixE("..\\x64\\Debug\\calibration_data\\20211125\\EffectorNDIData.csv");
-	classData.readMatrixERobot("..\\x64\\Debug\\calibration_data\\20211125\\EffectorRobotData.csv");
+    classData.readMatrixB("..\\x64\\Debug\\calibration_data\\20211209\\BaseNDIData.csv");
+	classData.readMatrixE("..\\x64\\Debug\\calibration_data\\20211209\\EffectorNDIData.csv");
+	classData.readMatrixERobot("..\\x64\\Debug\\calibration_data\\20211209\\EffectorRobotData.csv");
     Eigen::MatrixXd matrixB = classData.getMatrixB();
     Eigen::MatrixXd matrixE = classData.getMatrixE();
 	Eigen::MatrixXd matrixERoboto = classData.getMatrixERobot();
@@ -51,12 +55,32 @@ int main()
 	Vet.block(0, 0, 3, 3) = Ret;
 	Vet.block(0, 3, 3, 1) = Tet;
 	Vet(3, 3) = 1.0;
+	std::cout << "Vet:" << std::endl;
+	std::cout << Vet << std::endl;
+	std::cout << std::endl;
+
+	Eigen::Matrix4d Vte;
+	Vte.setZero();
+	Vte = Vet.inverse();
+	std::cout << "Vte:" << std::endl;
+	std::cout << Vte << std::endl;
+	std::cout << std::endl;
+	//Ð´ÈëÎÄ¼þ
+	std::ofstream outfile;
+	outfile.open("Vte.csv", std::ios::out);
+	for (int i = 0; i < 4; i++) {
+		outfile << Vte(i, 0) << "," << Vte(i, 1) << "," << Vte(i, 2) << "," << Vte(i, 3) << std::endl;
+	}
+	outfile.close();
 
 	Eigen::Matrix4d Vbo;
 	Vbo.setZero();
 	Vbo.block(0, 0, 3, 3) = Rbo;
 	Vbo.block(0, 3, 3, 1) = Tbo;
 	Vbo(3, 3) = 1.0;
+	std::cout << "Vbo:" << std::endl;
+	std::cout << Vbo << std::endl;
+	std::cout << std::endl;
 
 	classData.readMatrixTestRobot("..\\x64\\Debug\\calibration_data\\20211125\\testRobotData.csv");
 	classData.readMatrixTestNDI("..\\x64\\Debug\\calibration_data\\20211125\\testNDIData.csv");
