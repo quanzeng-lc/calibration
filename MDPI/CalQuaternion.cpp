@@ -264,3 +264,23 @@ Eigen::MatrixXd Calibration::RobotToTransformationMatrix(Eigen::MatrixXd robotMa
 	}
 	return tranaformationMatrix;
 }
+
+Eigen::MatrixXd Calibration::NDIToTransformationMatrix(Eigen::MatrixXd NDIMaxtrix) {
+	int rows = NDIMaxtrix.rows();
+	int cols = NDIMaxtrix.cols();
+	Eigen::MatrixXd translationMaxtrix(rows, 3);
+	translationMaxtrix = NDIMaxtrix.block(0, 4, rows, 3);
+	//最终得到的 4*n * 4的矩阵
+	Eigen::MatrixXd tranaformationMatrix(4 * rows, 4);
+	tranaformationMatrix.setZero();
+	for (int i = 0; i < rows; i++) {
+		//从第 0 列开始到 第 3 列 是四元数的表示
+		Eigen::Vector4d quaternion_vector = NDIMaxtrix.block(i, 0, 1, 4).transpose();
+		Eigen::Quaternion<double> quaternion_tmp = Eigen::Quaternion<double>(quaternion_vector);
+		Eigen::Matrix3d rotation = quaternion_tmp.matrix();
+		tranaformationMatrix.block(4 * i, 0, 3, 3) = rotation;
+		tranaformationMatrix.block(4 * i, 3, 3, 1) = translationMaxtrix.block(i, 0, 1, 3).transpose();
+		tranaformationMatrix(4 * i + 3, 3) = 1.0;
+	}
+	return tranaformationMatrix;
+}

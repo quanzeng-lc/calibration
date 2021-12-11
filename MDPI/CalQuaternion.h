@@ -52,8 +52,9 @@ public:
 		Eigen::VectorXd vectorParam, Eigen::VectorXd pointParam);
 	//求解最大的特征值及其特征向量
 	void calculateMaxEigenValueAndVector(Eigen::Matrix4d matrix, double& max_value, Eigen::Vector4d& corr_vector);
-	//机器人的六个
+	//机器人的六个参数表示的坐标系 转换成 4*4 变换矩阵
 	Eigen::MatrixXd RobotToTransformationMatrix(Eigen::MatrixXd robotMaxtrix);
-
+	//NDI的七个参数表示的坐标系 转换成 4*4 变换矩阵 前四个是姿态 后三个是空间位置
+	Eigen::MatrixXd NDIToTransformationMatrix(Eigen::MatrixXd NDIMaxtrix);
 };
 
