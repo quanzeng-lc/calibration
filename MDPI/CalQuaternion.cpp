@@ -82,7 +82,7 @@ Eigen::Matrix4d Calibration::DHParam2Matrix(std::vector<double> param) {
 
 Eigen::Matrix4d Calibration::calculateQuaternionQr(Eigen::Vector4d quaternionR) {
 	Eigen::Matrix4d matrix;
-	Eigen::Vector3d threeVector = quaternionR.block(0, 0, 1, 3);
+	Eigen::Vector3d threeVector = quaternionR.block(0, 0, 3, 1);
 	matrix.block(0, 0, 3, 3) = quaternionR[3] * Eigen::Matrix3d::Identity() + calculateSkewSymMatrix(threeVector);
 	matrix.block(0, 3, 3, 1) = threeVector;
 	matrix.block(3, 0, 1, 3) = -1 * threeVector.transpose();
@@ -92,7 +92,7 @@ Eigen::Matrix4d Calibration::calculateQuaternionQr(Eigen::Vector4d quaternionR) 
 
 Eigen::Matrix4d Calibration::calculateQuaternionWr(Eigen::Vector4d quaternionR) {
 	Eigen::Matrix4d matrix;
-	Eigen::Vector3d threeVector = quaternionR.block(0, 0, 1, 3);
+	Eigen::Vector3d threeVector = quaternionR.block(0, 0, 3, 1);
 	matrix.block(0, 0, 3, 3) = quaternionR[3] * Eigen::Matrix3d::Identity() - calculateSkewSymMatrix(threeVector);
 	matrix.block(0, 3, 3, 1) = threeVector;
 	matrix.block(3, 0, 1, 3) = -1 * threeVector.transpose();
@@ -112,15 +112,22 @@ Eigen::Matrix3d Calibration::calculateSkewSymMatrix(Eigen::Vector3d threeDVector
 	return skew_symmetric_matrix;
 }
 
-Eigen::VectorXd Calibration::optimalTransQuaternion(Eigen::MatrixXd robotMarkerMatrix, Eigen::MatrixXd NDIMarkerMatrix, Eigen::VectorXd vectorParam, Eigen::VectorXd pointParam, Eigen::VectorXd & optimalQuaternion)
+Eigen::VectorXd Calibration::optimalTransQuaternion(Eigen::MatrixXd robotMarkerMatrix, Eigen::MatrixXd NDIMarkerMatrix, 
+	Eigen::VectorXd vectorParam, Eigen::VectorXd pointParam, Eigen::VectorXd & optimalQuaternion)
 {
 	// robotMarkerMatrix NDIMarkerMatrix n*4*4
 	//首先将旋转矩阵和平移向量分离
 	//距离的四元数是平移平移向量的1/2 
 	Eigen::MatrixXd robotMarkerMatrixRotation = robotMarkerMatrix(Eigen::all, Eigen::seq(0, 2));
 	Eigen::MatrixXd robotMarkerMatrixTranslation = 0.5 * robotMarkerMatrix(Eigen::all, Eigen::seq(3, 3));
+	//在计算中，偏移向量的最后一个系数为 0
+	robotMarkerMatrixTranslation(Eigen::seqN(3, robotMarkerMatrixTranslation.rows()/4, 4), Eigen::all).setZero();
+	//std::cout << "translation :"<<std::endl <<robotMarkerMatrixTranslation << std::endl;
+
 	Eigen::MatrixXd NDIMarkerMatrixRotation = NDIMarkerMatrix(Eigen::all, Eigen::seq(0, 2));
 	Eigen::MatrixXd NDIMarkerMatrixTraTranslation = 0.5 * NDIMarkerMatrix(Eigen::all, Eigen::seq(3, 3));
+	//在计算中，偏移向量的最后一个系数为 0
+	NDIMarkerMatrixTraTranslation(Eigen::seqN(3, NDIMarkerMatrixTraTranslation.rows()/4, 4), Eigen::all).setZero();
 	//求解C1
 	Eigen::Matrix4d C1 = calculateC1(robotMarkerMatrixRotation, robotMarkerMatrixTranslation,
 		NDIMarkerMatrixRotation, NDIMarkerMatrixTraTranslation,
@@ -141,8 +148,8 @@ Eigen::VectorXd Calibration::optimalTransQuaternion(Eigen::MatrixXd robotMarkerM
 	Eigen::Vector4d calculate_s = -(C2 + C2.transpose()).inverse()*C3*max_eigen_vector;
 	//返回求得的对偶四元数
 	optimalQuaternion(Eigen::seq(0, 3), Eigen::all) = max_eigen_vector;
-	optimalQuaternion(Eigen::seq(4, 8), Eigen::all) = calculate_s;
-	return Eigen::VectorXd();
+	optimalQuaternion(Eigen::seq(4, 7), Eigen::all) = calculate_s;
+	return optimalQuaternion;
 }
 
 Eigen::Matrix4d Calibration::calculateC1(Eigen::MatrixXd robotMarkerMatrixRotation, Eigen::MatrixXd robotMarkerMatrixTranslation,
@@ -167,9 +174,9 @@ Eigen::Matrix4d Calibration::calculateC1(Eigen::MatrixXd robotMarkerMatrixRotati
 		Eigen::Vector4d NDIZ_vector = NDIMarkerMatrixRotation.block(4 * i, 2, 4, 1);
 		//取出NDI坐标系下对应的偏移量
 		Eigen::Vector4d NDI_translation_vector = NDIMarkerMatrixTranslation.block(4 * i, 0, 4, 1);
-		C1_previous = C1_previous - vectorParam[3 * i]*calculateQuaternionQr(NDIX_vector).transpose() * calculateQuaternionWr(robotX_vector);
-		C1_previous = C1_previous - vectorParam[3 * i + 1]*calculateQuaternionQr(NDIY_vector).transpose() * calculateQuaternionWr(robotY_vector);
-		C1_previous = C1_previous - vectorParam[3 * i + 2] * calculateQuaternionQr(NDIZ_vector).transpose() * calculateQuaternionWr(robotZ_vector);
+		C1_previous -=  vectorParam[3 * i]*calculateQuaternionQr(NDIX_vector).transpose() * calculateQuaternionWr(robotX_vector);
+		C1_previous -=  vectorParam[3 * i + 1]*calculateQuaternionQr(NDIY_vector).transpose() * calculateQuaternionWr(robotY_vector);
+		C1_previous -=  vectorParam[3 * i + 2] * calculateQuaternionQr(NDIZ_vector).transpose() * calculateQuaternionWr(robotZ_vector);
 		C1_next = C1_next - pointParam[i] * calculateQuaternionQr(NDI_translation_vector).transpose() * calculateQuaternionWr(robot_translation_vector);
 	}
 	C1 = 2 * (C1_previous + C1_next);
@@ -274,13 +281,38 @@ Eigen::MatrixXd Calibration::NDIToTransformationMatrix(Eigen::MatrixXd NDIMaxtri
 	Eigen::MatrixXd tranaformationMatrix(4 * rows, 4);
 	tranaformationMatrix.setZero();
 	for (int i = 0; i < rows; i++) {
-		//从第 0 列开始到 第 3 列 是四元数的表示
+		//从第 0 列开始到 第 3 列 是四元数 
+		//从NDI获得数据四元数 第一个是实部 后面三个是虚部
+		//Eigen四元数实例化时，如果直接用向量初始化 前三个数是虚部 最后一个数是实部
+		//可以用四个数初始化 第一个是实部 后面的是虚部 x y z
 		Eigen::Vector4d quaternion_vector = NDIMaxtrix.block(i, 0, 1, 4).transpose();
-		Eigen::Quaternion<double> quaternion_tmp = Eigen::Quaternion<double>(quaternion_vector);
+		Eigen::Quaternion<double> quaternion_tmp = Eigen::Quaternion<double>(quaternion_vector[0], quaternion_vector[1],
+			quaternion_vector[2], quaternion_vector[3]);
+		//double w = quaternion_tmp.w();
+		//double x = quaternion_tmp.x();
+		//double y = quaternion_tmp.y();
+		//double z = quaternion_tmp.z();
 		Eigen::Matrix3d rotation = quaternion_tmp.matrix();
 		tranaformationMatrix.block(4 * i, 0, 3, 3) = rotation;
 		tranaformationMatrix.block(4 * i, 3, 3, 1) = translationMaxtrix.block(i, 0, 1, 3).transpose();
 		tranaformationMatrix(4 * i + 3, 3) = 1.0;
 	}
 	return tranaformationMatrix;
+}
+
+Eigen::Matrix4d Calibration::DualQuaternion2Matrix(Eigen::VectorXd dualQuaternion)
+{
+	Eigen::Matrix4d matrix;
+	//取出四元数的r部分 实部 
+	Eigen::Vector4d dual_quaternion_r = dualQuaternion(Eigen::seq(0, 3), Eigen::all);
+	Eigen::Matrix4d rotation_matrix = calculateQuaternionWr(dual_quaternion_r).transpose()
+		* calculateQuaternionQr(dual_quaternion_r);
+	//取出四元数的s部分 对偶部
+	Eigen::Vector4d dual_quaternion_s = dualQuaternion(Eigen::seq(4, 7), Eigen::all);
+	Eigen::Vector4d t_italic_vector = calculateQuaternionWr(dual_quaternion_r).transpose()
+		* dual_quaternion_s;
+	Eigen::Vector3d t_vector = 2 * t_italic_vector(Eigen::seq(0, 2), Eigen::all);
+	matrix = rotation_matrix;
+	matrix.block(0, 3, 3, 1) = t_vector;
+	return matrix;
 }

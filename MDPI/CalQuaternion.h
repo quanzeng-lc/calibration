@@ -1,5 +1,6 @@
 #pragma once
 #include<Eigen/Eigen>
+#include<iostream>
 
 class Calibration
 {
@@ -56,5 +57,7 @@ public:
 	Eigen::MatrixXd RobotToTransformationMatrix(Eigen::MatrixXd robotMaxtrix);
 	//NDI的七个参数表示的坐标系 转换成 4*4 变换矩阵 前四个是姿态 后三个是空间位置
 	Eigen::MatrixXd NDIToTransformationMatrix(Eigen::MatrixXd NDIMaxtrix);
+	//对偶四元数转换成4*4的转换矩阵
+	Eigen::Matrix4d DualQuaternion2Matrix(Eigen::VectorXd dualQuaternion);
 };
 
