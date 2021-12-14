@@ -2,6 +2,14 @@
 
 Calibration::Calibration() {
 	point_num = 0;
+	delta = 1e-6;
+	this->DH_list.conservativeResize(6, 4);
+	theta_increment.conservativeResize(6);
+	a_increment.conservativeResize(6);
+	d_increment.conservativeResize(6);
+	theta_increment.setZero();
+	a_increment.setZero();
+	d_increment.setZero();
 }
 
 void Calibration::set_point_num(int point_num)
@@ -9,37 +17,144 @@ void Calibration::set_point_num(int point_num)
 	this->point_num = point_num;
 }
 
-Eigen::Matrix4d Calibration::RobotDHMatrixAndJointAngle(std::vector<std::vector<double>> param_list, std::vector<double> jointAngle) {
-	size_t param_list_num = param_list.size();
-	std::vector<std::vector<double>> param_list_new;
-	size_t joint_angle_num = jointAngle.size();
-	if (param_list_num == joint_angle_num) {
-		for (size_t i = 0; i < param_list_num; i++)
-		{
-			std::vector<double> param = param_list[i];
-			size_t param_num = param.size();
-			if (param_num == 4) {
-				//theta 角加上关节旋转的角度
-				param[0] = param[0] + jointAngle[i];
-			}
-			param_list_new.push_back(param);
-		}
-	}
+void Calibration::setNorminalDHParam(Eigen::MatrixXd DHParam_list) {
+	this->DH_list = DHParam_list;
+}
+
+void Calibration::setVet(Eigen::Matrix4d Vet)
+{
+	this->Vet = Vet;
+}
+
+void Calibration::setVob(Eigen::Matrix4d Vob)
+{
+	this->Vob = Vob;
+}
+
+Eigen::Matrix4d Calibration::RobotDHMatrixAndJointAngle(Eigen::VectorXd jointAngle) {
+	int param_list_num = jointAngle.rows();
+	//相当于第一列加上了关节角度
+	Eigen::MatrixXd dh_param = DH_list;
+	//std::cout << "dh_param" << std::endl;
+	//std::cout << dh_param << std::endl << std::endl;
+	//加上输入的theta角度
+	dh_param(Eigen::all, Eigen::seq(0, 0)) = dh_param(Eigen::all, Eigen::seq(0, 0)) + jointAngle;
+	//加上每个参数的增量
+	dh_param(Eigen::all, Eigen::seq(0, 0)) = dh_param(Eigen::all, Eigen::seq(0, 0)) + theta_increment;
+	dh_param(Eigen::all, Eigen::seq(1, 1)) = dh_param(Eigen::all, Eigen::seq(1, 1)) + d_increment;
+	dh_param(Eigen::all, Eigen::seq(3, 3)) = dh_param(Eigen::all, Eigen::seq(3, 3)) + a_increment;
+	//std::cout << "dh_param" << std::endl;
+	//std::cout << dh_param << std::endl << std::endl;
 	Eigen::Matrix4d trans_matrix;
-	trans_matrix = RobotDHMatrix(param_list_new);
+	trans_matrix = RobotDHMatrix(dh_param);
 	return trans_matrix;
 }
 
-Eigen::Matrix4d Calibration::RobotDHMatrix(std::vector<std::vector<double>> param_list) {
+Eigen::MatrixXd Calibration::RobotDHMatrixAndMultiJointAngle(Eigen::MatrixXd jointAngle_list)
+{
+	int rows = jointAngle_list.rows();
+	Eigen::MatrixXd multi_matrix(4 * rows, 4);
+	for (int i = 0; i < rows; i++) {
+		Eigen::VectorXd joint_angle(6);
+		joint_angle = jointAngle_list(Eigen::seq(i, i), Eigen::all).transpose();
+		Eigen::Matrix4d effector_matrix = RobotDHMatrixAndJointAngle(joint_angle);
+		//if (i < 10) {
+		//	std::cout << "effector_matrix " << i << ":" << std::endl;
+		//	std::cout << effector_matrix << std::endl;
+		//	std::cout << std::endl;
+		//}
+		multi_matrix(Eigen::seq(4 * i, 4 * i + 3), Eigen::all) = effector_matrix;
+	}
+	return multi_matrix;
+}
+
+
+Eigen::Matrix4d Calibration::RobotDHMatrixAndDParam(Eigen::VectorXd dParam) {
+	int param_list_num = dParam.rows();
+	//相当于第二列加上了参数d
+	Eigen::MatrixXd dh_param = DH_list;
+	//std::cout << "dh_param" << std::endl;
+	//std::cout << dh_param << std::endl << std::endl;
+	dh_param(Eigen::all, Eigen::seq(1, 1)) = dh_param(Eigen::all, Eigen::seq(1, 1)) + dParam;
+	//加上每个参数的增量
+	dh_param(Eigen::all, Eigen::seq(0, 0)) = dh_param(Eigen::all, Eigen::seq(0, 0)) + theta_increment;
+	dh_param(Eigen::all, Eigen::seq(1, 1)) = dh_param(Eigen::all, Eigen::seq(1, 1)) + d_increment;
+	dh_param(Eigen::all, Eigen::seq(3, 3)) = dh_param(Eigen::all, Eigen::seq(3, 3)) + a_increment;
+	//std::cout << "dh_param" << std::endl;
+	//std::cout << dh_param << std::endl << std::endl;
+	Eigen::Matrix4d trans_matrix;
+	trans_matrix = RobotDHMatrix(dh_param);
+	return trans_matrix;
+}
+
+Eigen::Matrix4d Calibration::RobotDHMatrixAndAParam(Eigen::VectorXd aParam) {
+	int param_list_num = aParam.rows();
+	//相当于第二列加上了参数d
+	Eigen::MatrixXd dh_param = DH_list;
+	//std::cout << "dh_param" << std::endl;
+	//std::cout << dh_param << std::endl << std::endl;
+	dh_param(Eigen::all, Eigen::seq(3, 3)) = dh_param(Eigen::all, Eigen::seq(3, 3)) + aParam;
+	//加上每个参数的增量
+	dh_param(Eigen::all, Eigen::seq(0, 0)) = dh_param(Eigen::all, Eigen::seq(0, 0)) + theta_increment;
+	dh_param(Eigen::all, Eigen::seq(1, 1)) = dh_param(Eigen::all, Eigen::seq(1, 1)) + d_increment;
+	dh_param(Eigen::all, Eigen::seq(3, 3)) = dh_param(Eigen::all, Eigen::seq(3, 3)) + a_increment;
+	//std::cout << "dh_param" << std::endl;
+	//std::cout << dh_param << std::endl << std::endl;
+	Eigen::Matrix4d trans_matrix;
+	trans_matrix = RobotDHMatrix(dh_param);
+	return trans_matrix;
+}
+
+Eigen::Matrix4d Calibration::RobotDHMatrixJointAngleAndDParam(Eigen::VectorXd jointAngle, Eigen::VectorXd dParam) {
+	int param_list_num = jointAngle.rows();
+	//相当于第一列加上了关节角度
+	Eigen::MatrixXd dh_param = DH_list;
+	//std::cout << "dh_param" << std::endl;
+	//std::cout << dh_param << std::endl << std::endl;
+	//加上输入的theta角度
+	dh_param(Eigen::all, Eigen::seq(0, 0)) = dh_param(Eigen::all, Eigen::seq(0, 0)) + jointAngle;
+	//加上每个参数的增量
+	dh_param(Eigen::all, Eigen::seq(0, 0)) = dh_param(Eigen::all, Eigen::seq(0, 0)) + theta_increment;
+	//加上d参数的增量
+	dh_param(Eigen::all, Eigen::seq(1, 1)) = dh_param(Eigen::all, Eigen::seq(1, 1)) + d_increment + dParam;
+	dh_param(Eigen::all, Eigen::seq(3, 3)) = dh_param(Eigen::all, Eigen::seq(3, 3)) + a_increment;
+	//std::cout << "dh_param" << std::endl;
+	//std::cout << dh_param << std::endl << std::endl;
+	Eigen::Matrix4d trans_matrix;
+	trans_matrix = RobotDHMatrix(dh_param);
+	return trans_matrix;
+}
+
+Eigen::Matrix4d Calibration::RobotDHMatrixJointAngleAndAParam(Eigen::VectorXd jointAngle, Eigen::VectorXd aParam) {
+	int param_list_num = jointAngle.rows();
+	//相当于第一列加上了关节角度
+	Eigen::MatrixXd dh_param = DH_list;
+	//std::cout << "dh_param" << std::endl;
+	//std::cout << dh_param << std::endl << std::endl;
+	//加上输入的theta角度
+	dh_param(Eigen::all, Eigen::seq(0, 0)) = dh_param(Eigen::all, Eigen::seq(0, 0)) + jointAngle;
+	//加上每个参数的增量
+	dh_param(Eigen::all, Eigen::seq(0, 0)) = dh_param(Eigen::all, Eigen::seq(0, 0)) + theta_increment;
+	dh_param(Eigen::all, Eigen::seq(1, 1)) = dh_param(Eigen::all, Eigen::seq(1, 1)) + d_increment;
+	//加上a参数的增量
+	dh_param(Eigen::all, Eigen::seq(3, 3)) = dh_param(Eigen::all, Eigen::seq(3, 3)) + a_increment + aParam;
+	//std::cout << "dh_param" << std::endl;
+	//std::cout << dh_param << std::endl << std::endl;
+	Eigen::Matrix4d trans_matrix;
+	trans_matrix = RobotDHMatrix(dh_param);
+	return trans_matrix;
+}
+
+Eigen::Matrix4d Calibration::RobotDHMatrix(Eigen::MatrixXd param_list) {
 	Eigen::Matrix4d Robot_trans;
 	Robot_trans.setIdentity();
-	size_t param_list_num = param_list.size();
+	size_t param_list_num = param_list.rows();
 	for (int i = 0; i < param_list_num; i++) {
 		//取出其中的一个DH参数，转成转换矩阵
-		std::vector<double> param = param_list[i];
+		Eigen::Vector4d param = param_list(Eigen::seq(i, i), Eigen::all).transpose();
 		Eigen::Matrix4d DHMatrix;
 		DHMatrix.setIdentity();
-		size_t param_num = param.size();
+		int param_num = param.rows();
 		if (param_num == 4) {
 			DHMatrix = DHParam2Matrix(param);
 			Robot_trans = Robot_trans * DHMatrix;
@@ -48,7 +163,7 @@ Eigen::Matrix4d Calibration::RobotDHMatrix(std::vector<std::vector<double>> para
 	return Robot_trans;
 }
 
-Eigen::Matrix4d Calibration::DHParam2Matrix(std::vector<double> param) {
+Eigen::Matrix4d Calibration::DHParam2Matrix(Eigen::VectorXd param) {
 	double theta = param[0];
 	double dis = param[1];
 	double alpha = param[2];
@@ -265,9 +380,17 @@ Eigen::MatrixXd Calibration::RobotToTransformationMatrix(Eigen::MatrixXd robotMa
 			angleaxis = Eigen::AngleAxisd(angle, vector_tmp / angle);
 		}
 		Eigen::Matrix3d rotation = angleaxis.matrix();
-		tranaformationMatrix.block(4 * i, 0, 3, 3) = rotation;
-		tranaformationMatrix.block(4 * i, 3, 3, 1) = translationMaxtrix.block(i, 0, 1, 3).transpose();
-		tranaformationMatrix(4 * i + 3, 3) = 1.0;
+		Eigen::Matrix4d effector_matrix;
+		effector_matrix.setZero();
+		effector_matrix.block(0, 0, 3, 3) = rotation;
+		effector_matrix.block(0, 3, 3, 1) = translationMaxtrix.block(i, 0, 1, 3).transpose();
+		effector_matrix(3, 3) = 1.0;
+		tranaformationMatrix.block(4 * i, 0, 4, 4) = effector_matrix;
+		//if (i < 10) {
+		//	std::cout << "effector_matrix "<< i <<":" << std::endl;
+		//	std::cout << effector_matrix << std::endl;
+		//	std::cout << std::endl;
+		//}
 	}
 	return tranaformationMatrix;
 }
@@ -316,3 +439,109 @@ Eigen::Matrix4d Calibration::DualQuaternion2Matrix(Eigen::VectorXd dualQuaternio
 	matrix.block(0, 3, 3, 1) = t_vector;
 	return matrix;
 }
+
+Eigen::VectorXd Calibration::matrix2XYZEulerAngle(Eigen::Matrix4d transform_matrixd) {
+	Eigen::VectorXd XYZ_EulerAngle_vector(6);
+	Eigen::Matrix3d rotation_matrix = transform_matrixd.block(0, 0, 3, 3);
+	//先是 yaw 航向角 pitch俯仰角 roll滚向角
+	Eigen::Vector3d Eulaer_angle = rotation_matrix.eulerAngles(2, 1, 0);
+	XYZ_EulerAngle_vector[0] = transform_matrixd(0, 3);
+	XYZ_EulerAngle_vector[1] = transform_matrixd(1, 3);
+	XYZ_EulerAngle_vector[2] = transform_matrixd(2, 3);
+	return XYZ_EulerAngle_vector;
+}
+
+Eigen::MatrixXd Calibration::calculateOnePointJacobiMatrix(Eigen::VectorXd joint_angle) {
+	Eigen::MatrixXd matrix(6, 12);
+	//对theta1求偏导数
+	//不加增量得到Marker坐标系在NDI上的表示
+	Eigen::Matrix4d effector_matrix = this->Vob*this->RobotDHMatrixAndJointAngle(joint_angle)*this->Vet;
+	Eigen::VectorXd effectot_coefficient = matrix2XYZEulerAngle(effector_matrix);
+
+	for (int i = 0; i < 6; i++) {
+		Eigen::VectorXd joint_angle_and_delta = joint_angle;
+		joint_angle_and_delta[i] += delta;
+		Eigen::Matrix4d effector_matrix_and_delta = this->Vob*this->RobotDHMatrixAndJointAngle(joint_angle_and_delta)*this->Vet;
+		Eigen::VectorXd effectot_coefficient_and_delta = matrix2XYZEulerAngle(effector_matrix_and_delta);
+		//计算x y z alpha beta gama 的偏差系数
+		Eigen::VectorXd delta_vector = (effectot_coefficient_and_delta - effectot_coefficient) / delta;
+		matrix(Eigen::all, Eigen::seq(i, i)) = delta_vector;
+	}
+	
+	int d_index[4] = {0, 3, 4, 5};
+	Eigen::VectorXd d_delta(6);
+	d_delta.setZero();
+	for (int i = 0; i < 4; i++) {
+		d_delta[d_index[i]] += delta;
+		Eigen::Matrix4d effector_matrix_and_delta = this->Vob*this->RobotDHMatrixJointAngleAndDParam(joint_angle, d_delta)*this->Vet;
+		Eigen::VectorXd effectot_coefficient_and_delta = matrix2XYZEulerAngle(effector_matrix_and_delta);
+		//计算x y z alpha beta gama 的偏差系数
+		Eigen::VectorXd delta_vector = (effectot_coefficient_and_delta - effectot_coefficient) / delta;
+		matrix(Eigen::all, Eigen::seq(i+6, i+6)) = delta_vector;
+	}
+
+	int a_index[2] = {1, 2};
+	Eigen::VectorXd a_delta(6);
+	d_delta.setZero();
+	for (int i = 0; i < 4; i++) {
+		a_delta[a_index[i]] += delta;
+		Eigen::Matrix4d effector_matrix_and_delta = this->Vob*this->RobotDHMatrixJointAngleAndAParam(joint_angle, a_delta)*this->Vet;
+		Eigen::VectorXd effectot_coefficient_and_delta = matrix2XYZEulerAngle(effector_matrix_and_delta);
+		//计算x y z alpha beta gama 的偏差系数
+		Eigen::VectorXd delta_vector = (effectot_coefficient_and_delta - effectot_coefficient) / delta;
+		matrix(Eigen::all, Eigen::seq(i + 10, i + 10)) = delta_vector;
+	}
+	return matrix;
+}
+
+Eigen::MatrixXd Calibration::calculateMultiPointJacobiMatrix(Eigen::MatrixXd joint_angle) {
+	int rows = joint_angle.rows();
+	Eigen::MatrixXd Jagobi_matrix(6 * rows, 12);
+	for (int i = 0; i < rows; i++) {
+		Eigen::VectorXd one_point_joint_angle(6);
+		one_point_joint_angle = joint_angle(Eigen::seq(i, i), Eigen::all);
+		Jagobi_matrix(Eigen::seq(6 * i, 6 * i + 5), Eigen::all) = calculateOnePointJacobiMatrix(one_point_joint_angle);
+	}
+	return Jagobi_matrix;
+}
+
+Eigen::VectorXd Calibration::calculateMultiPointDifference(Eigen::MatrixXd robot_marker_matrix, Eigen::MatrixXd NDI_matrix)
+{
+	//误差向量 n*6
+	Eigen::VectorXd difference_vector(point_num * 6);
+	for (size_t i = 0; i < point_num; i++)
+	{
+		//取出Marker在机器人基座标下的坐标系
+		Eigen::Matrix4d robot_matrix = robot_marker_matrix(Eigen::seq(4 * i, 4 * i + 3), Eigen::all);
+		//转换到OTS坐标系下
+		Eigen::Matrix4d cal_NDI_marker = this->Vob*robot_matrix;
+		//转换成 xyz alpha beta gama
+		Eigen::VectorXd cal_xyz_alpha_beta_gama = this->matrix2XYZEulerAngle(cal_NDI_marker);
+		//取出Marker在NDI的坐标系
+		Eigen::Matrix4d NDI_marker = NDI_matrix(Eigen::seq(4 * i, 4 * i + 3), Eigen::all);
+		Eigen::VectorXd ndi_maker_alpha_beta_gama = this->matrix2XYZEulerAngle(NDI_marker);
+		//保存他们之间的差
+		difference_vector(Eigen::seq(6 * i, 6 * i + 5), Eigen::all) = ndi_maker_alpha_beta_gama - cal_xyz_alpha_beta_gama;
+	}
+	return Eigen::VectorXd();
+}
+
+void Calibration::calculateIncrement(Eigen::MatrixXd joint_angle, Eigen::MatrixXd robot_marker_matrix, Eigen::MatrixXd NDI_matrix)
+{
+	Eigen::VectorXd increment_vector;
+	Eigen::MatrixXd Jagobi_matrix = calculateMultiPointJacobiMatrix(joint_angle);
+
+	//计算右边的偏差
+	Eigen::VectorXd marker_loss_vector = calculateMultiPointDifference(robot_marker_matrix, NDI_matrix);
+	increment_vector = (Jagobi_matrix.transpose()*Jagobi_matrix).inverse()*Jagobi_matrix.transpose();
+	theta_increment += increment_vector(Eigen::seq(0, 5), Eigen::all);
+	int d_index[4] = { 0, 3, 4, 5 };
+	for (int i = 0; i < 4; i++) {
+		d_increment[d_index[i]] += increment_vector[i + 6];
+	}
+	int a_index[2] = { 1, 2 };
+	for (int i = 0; i < 2; i++) {
+		a_increment[a_index[i]] += increment_vector[i + 10];
+	}
+}
+

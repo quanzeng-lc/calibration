@@ -7,18 +7,47 @@ class Calibration
 private:
 	//用来记录点的个数
 	int point_num;
+	//存放DH参数表
+	Eigen::MatrixXd DH_list;
+	Eigen::Matrix4d Vet;
+	Eigen::Matrix4d Vob;
+	//用来求偏导数的增量
+	double delta;
+
+	Eigen::VectorXd theta_increment;
+	Eigen::VectorXd d_increment;
+	Eigen::VectorXd a_increment;
+
 public:
 	Calibration();
 
 	void set_point_num(int point_num);
-	//第一个参数是DH的参数， 第二个参数是UR机械臂的每个关节角度
+	//将DH参数放到成员变量里面
+	void setNorminalDHParam(Eigen::MatrixXd DHParam_list);
+	//将在文件中读取的Marker相对于机器人末端的坐标系保存
+	void setVet(Eigen::Matrix4d Vet);
+	//将计算得到的Vob保存下来
+	void setVob(Eigen::Matrix4d Vob);
+
+	//参数是UR机械臂的每个关节角度，相当于第一列加上了关节角度
 	//最终形成了机器人末端坐标系的表示
-	Eigen::Matrix4d RobotDHMatrixAndJointAngle(std::vector<std::vector<double>> param_list, std::vector<double> jointAngle);
+	Eigen::Matrix4d RobotDHMatrixAndJointAngle(Eigen::VectorXd jointAngle);
+	//多个位姿对应的关节角得到的末端坐标系
+	Eigen::MatrixXd RobotDHMatrixAndMultiJointAngle(Eigen::MatrixXd jointAngle_list);
+	//初始姿态的DH参数 对其中的d参数进行修正
+	Eigen::Matrix4d RobotDHMatrixAndDParam(Eigen::VectorXd dParam);
+	//初始姿态的DH参数 对其中的a参数进行修正
+	Eigen::Matrix4d RobotDHMatrixAndAParam(Eigen::VectorXd aParam);
+	//
+	Eigen::Matrix4d RobotDHMatrixJointAngleAndDParam(Eigen::VectorXd jointAngle, Eigen::VectorXd dParam);
+	//
+	Eigen::Matrix4d RobotDHMatrixJointAngleAndAParam(Eigen::VectorXd jointAngle, Eigen::VectorXd aParam);
+
 	//根据D-H参数生成相邻关节的转换矩阵
 	// param 参数顺序是 theta dis alpha a_dis
-	Eigen::Matrix4d DHParam2Matrix(std::vector<double> param);
+	Eigen::Matrix4d DHParam2Matrix(Eigen::VectorXd);
 	//多个DH参数形成了机器人的末端坐标系
-	Eigen::Matrix4d RobotDHMatrix(std::vector<std::vector<double>> param_list);
+	Eigen::Matrix4d RobotDHMatrix(Eigen::MatrixXd param_list);
 
 	//计算论文中的Q(r)表示矩阵函数
 	//参数表示四元数的向量
@@ -59,5 +88,17 @@ public:
 	Eigen::MatrixXd NDIToTransformationMatrix(Eigen::MatrixXd NDIMaxtrix);
 	//对偶四元数转换成4*4的转换矩阵
 	Eigen::Matrix4d DualQuaternion2Matrix(Eigen::VectorXd dualQuaternion);
+	//转换矩阵变成 x y z alpha beta gama
+	Eigen::VectorXd matrix2XYZEulerAngle(Eigen::Matrix4d transform_matrixd);
+
+	//计算单个六轴关节角的雅各比系数矩阵 坐标的误差只计算x y z alpha beta gama 6个误差 参数扰动是12个参数 
+	//因此返回值是 6*12 的矩阵
+	Eigen::MatrixXd calculateOnePointJacobiMatrix(Eigen::VectorXd joint_angle);
+	//计算多个点位的雅各比系数矩阵
+	Eigen::MatrixXd calculateMultiPointJacobiMatrix(Eigen::MatrixXd joint_angle);
+	//计算多个点位的误差 NDI获得点和通过Vob计算出来的点比较
+	Eigen::VectorXd calculateMultiPointDifference(Eigen::MatrixXd robot_marker_matrix, Eigen::MatrixXd NDI_matrix);
+	//计算各个增量
+	void calculateIncrement(Eigen::MatrixXd joint_angle, Eigen::MatrixXd robot_marker_matrix, Eigen::MatrixXd NDI_matrix);
 };
 

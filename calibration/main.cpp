@@ -10,9 +10,9 @@
 int main()
 {
     caliData classData;
-    classData.readMatrixB("..\\x64\\Debug\\calibration_data\\20211209\\BaseNDIData.csv");
-	classData.readMatrixE("..\\x64\\Debug\\calibration_data\\20211209\\EffectorNDIData.csv");
-	classData.readMatrixERobot("..\\x64\\Debug\\calibration_data\\20211209\\EffectorRobotData.csv");
+    classData.readMatrixB("..\\x64\\Debug\\calibration_data\\20211214\\BaseNDIData.csv");
+	classData.readMatrixE("..\\x64\\Debug\\calibration_data\\20211214\\EffectorNDIData.csv");
+	classData.readMatrixERobot("..\\x64\\Debug\\calibration_data\\20211214\\EffectorRobotData.csv");
     Eigen::MatrixXd matrixB = classData.getMatrixB();
     Eigen::MatrixXd matrixE = classData.getMatrixE();
 	Eigen::MatrixXd matrixERoboto = classData.getMatrixERobot();
