@@ -16,6 +16,7 @@ public:
     void calculateRet();
     void calculateTetAndTbo();
 	Eigen::MatrixXd RobotToTransformationMatrix(Eigen::MatrixXd robotMaxtrix);
+	Eigen::MatrixXd NDIToTransformationMatrix(Eigen::MatrixXd NDIMaxtrix);
 
 	Eigen::Matrix3d getRbo();
 	Eigen::MatrixXd getReo();

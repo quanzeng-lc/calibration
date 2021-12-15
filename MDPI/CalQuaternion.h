@@ -29,6 +29,10 @@ public:
 	//将计算得到的Vob保存下来
 	void setVob(Eigen::Matrix4d Vob);
 
+	Eigen::VectorXd getTheta_increment();
+	Eigen::VectorXd getd_increment();
+	Eigen::VectorXd geta_increment();
+
 	//参数是UR机械臂的每个关节角度，相当于第一列加上了关节角度
 	//最终形成了机器人末端坐标系的表示
 	Eigen::Matrix4d RobotDHMatrixAndJointAngle(Eigen::VectorXd jointAngle);

@@ -275,3 +275,31 @@ Eigen::MatrixXd calculation::RobotToTransformationMatrix(Eigen::MatrixXd robotMa
 	}
 	return tranaformationMatrix;
 }
+
+Eigen::MatrixXd calculation::NDIToTransformationMatrix(Eigen::MatrixXd NDIMaxtrix) {
+	int rows = NDIMaxtrix.rows();
+	int cols = NDIMaxtrix.cols();
+	Eigen::MatrixXd translationMaxtrix(rows, 3);
+	translationMaxtrix = NDIMaxtrix.block(0, 4, rows, 3);
+	//最终得到的 4*n * 4的矩阵
+	Eigen::MatrixXd tranaformationMatrix(4 * rows, 4);
+	tranaformationMatrix.setZero();
+	for (int i = 0; i < rows; i++) {
+		//从第 0 列开始到 第 3 列 是四元数 
+		//从NDI获得数据四元数 第一个是实部 后面三个是虚部
+		//Eigen四元数实例化时，如果直接用向量初始化 前三个数是虚部 最后一个数是实部
+		//可以用四个数初始化 第一个是实部 后面的是虚部 x y z
+		Eigen::Vector4d quaternion_vector = NDIMaxtrix.block(i, 0, 1, 4).transpose();
+		Eigen::Quaternion<double> quaternion_tmp = Eigen::Quaternion<double>(quaternion_vector[0], quaternion_vector[1],
+			quaternion_vector[2], quaternion_vector[3]);
+		//double w = quaternion_tmp.w();
+		//double x = quaternion_tmp.x();
+		//double y = quaternion_tmp.y();
+		//double z = quaternion_tmp.z();
+		Eigen::Matrix3d rotation = quaternion_tmp.matrix();
+		tranaformationMatrix.block(4 * i, 0, 3, 3) = rotation;
+		tranaformationMatrix.block(4 * i, 3, 3, 1) = translationMaxtrix.block(i, 0, 1, 3).transpose();
+		tranaformationMatrix(4 * i + 3, 3) = 1.0;
+	}
+	return tranaformationMatrix;
+}

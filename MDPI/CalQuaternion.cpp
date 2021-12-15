@@ -31,6 +31,21 @@ void Calibration::setVob(Eigen::Matrix4d Vob)
 	this->Vob = Vob;
 }
 
+Eigen::VectorXd Calibration::getTheta_increment()
+{
+	return this->theta_increment;
+}
+
+Eigen::VectorXd Calibration::getd_increment()
+{
+	return this->d_increment;
+}
+
+Eigen::VectorXd Calibration::geta_increment()
+{
+	return this->a_increment;
+}
+
 Eigen::Matrix4d Calibration::RobotDHMatrixAndJointAngle(Eigen::VectorXd jointAngle) {
 	int param_list_num = jointAngle.rows();
 	//相当于第一列加上了关节角度
@@ -442,12 +457,14 @@ Eigen::Matrix4d Calibration::DualQuaternion2Matrix(Eigen::VectorXd dualQuaternio
 
 Eigen::VectorXd Calibration::matrix2XYZEulerAngle(Eigen::Matrix4d transform_matrixd) {
 	Eigen::VectorXd XYZ_EulerAngle_vector(6);
+	XYZ_EulerAngle_vector.setZero();
 	Eigen::Matrix3d rotation_matrix = transform_matrixd.block(0, 0, 3, 3);
 	//先是 yaw 航向角 pitch俯仰角 roll滚向角
 	Eigen::Vector3d Eulaer_angle = rotation_matrix.eulerAngles(2, 1, 0);
 	XYZ_EulerAngle_vector[0] = transform_matrixd(0, 3);
 	XYZ_EulerAngle_vector[1] = transform_matrixd(1, 3);
 	XYZ_EulerAngle_vector[2] = transform_matrixd(2, 3);
+	XYZ_EulerAngle_vector(Eigen::seq(3, 5), Eigen::all) = Eulaer_angle;
 	return XYZ_EulerAngle_vector;
 }
 
@@ -457,7 +474,6 @@ Eigen::MatrixXd Calibration::calculateOnePointJacobiMatrix(Eigen::VectorXd joint
 	//不加增量得到Marker坐标系在NDI上的表示
 	Eigen::Matrix4d effector_matrix = this->Vob*this->RobotDHMatrixAndJointAngle(joint_angle)*this->Vet;
 	Eigen::VectorXd effectot_coefficient = matrix2XYZEulerAngle(effector_matrix);
-
 	for (int i = 0; i < 6; i++) {
 		Eigen::VectorXd joint_angle_and_delta = joint_angle;
 		joint_angle_and_delta[i] += delta;
@@ -482,13 +498,19 @@ Eigen::MatrixXd Calibration::calculateOnePointJacobiMatrix(Eigen::VectorXd joint
 
 	int a_index[2] = {1, 2};
 	Eigen::VectorXd a_delta(6);
-	d_delta.setZero();
-	for (int i = 0; i < 4; i++) {
+	a_delta.setZero();
+	for (int i = 0; i < 2; i++) {
 		a_delta[a_index[i]] += delta;
 		Eigen::Matrix4d effector_matrix_and_delta = this->Vob*this->RobotDHMatrixJointAngleAndAParam(joint_angle, a_delta)*this->Vet;
 		Eigen::VectorXd effectot_coefficient_and_delta = matrix2XYZEulerAngle(effector_matrix_and_delta);
+		//std::cout << "effectot_coefficient_and_delta:" << std::endl;
+		//std::cout << effectot_coefficient_and_delta << std::endl;
+		//std::cout << std::endl;
 		//计算x y z alpha beta gama 的偏差系数
 		Eigen::VectorXd delta_vector = (effectot_coefficient_and_delta - effectot_coefficient) / delta;
+		//std::cout << "delta_vector:" << std::endl;
+		//std::cout << delta_vector << std::endl;
+		//std::cout << std::endl;
 		matrix(Eigen::all, Eigen::seq(i + 10, i + 10)) = delta_vector;
 	}
 	return matrix;
@@ -499,8 +521,12 @@ Eigen::MatrixXd Calibration::calculateMultiPointJacobiMatrix(Eigen::MatrixXd joi
 	Eigen::MatrixXd Jagobi_matrix(6 * rows, 12);
 	for (int i = 0; i < rows; i++) {
 		Eigen::VectorXd one_point_joint_angle(6);
-		one_point_joint_angle = joint_angle(Eigen::seq(i, i), Eigen::all);
-		Jagobi_matrix(Eigen::seq(6 * i, 6 * i + 5), Eigen::all) = calculateOnePointJacobiMatrix(one_point_joint_angle);
+		one_point_joint_angle = joint_angle(Eigen::seq(i, i), Eigen::all).transpose();
+		Eigen::MatrixXd onePointJagobi = calculateOnePointJacobiMatrix(one_point_joint_angle);
+		//std::cout << "onePointJagobi:" << std::endl;
+		//std::cout << onePointJagobi << std::endl;
+		//std::cout << std::endl;
+		Jagobi_matrix(Eigen::seq(6 * i, 6 * i + 5), Eigen::all) = onePointJagobi;
 	}
 	return Jagobi_matrix;
 }
@@ -517,24 +543,38 @@ Eigen::VectorXd Calibration::calculateMultiPointDifference(Eigen::MatrixXd robot
 		Eigen::Matrix4d cal_NDI_marker = this->Vob*robot_matrix;
 		//转换成 xyz alpha beta gama
 		Eigen::VectorXd cal_xyz_alpha_beta_gama = this->matrix2XYZEulerAngle(cal_NDI_marker);
+		//std::cout << "cal_xyz_alpha_beta_gama:" << std::endl;
+		//std::cout << cal_xyz_alpha_beta_gama << std::endl;
+		//std::cout << std::endl;
 		//取出Marker在NDI的坐标系
 		Eigen::Matrix4d NDI_marker = NDI_matrix(Eigen::seq(4 * i, 4 * i + 3), Eigen::all);
 		Eigen::VectorXd ndi_maker_alpha_beta_gama = this->matrix2XYZEulerAngle(NDI_marker);
+		//std::cout << "ndi_maker_alpha_beta_gama:" << std::endl;
+		//std::cout << ndi_maker_alpha_beta_gama << std::endl;
+		//std::cout << std::endl;
 		//保存他们之间的差
 		difference_vector(Eigen::seq(6 * i, 6 * i + 5), Eigen::all) = ndi_maker_alpha_beta_gama - cal_xyz_alpha_beta_gama;
 	}
-	return Eigen::VectorXd();
+	return difference_vector;
 }
 
 void Calibration::calculateIncrement(Eigen::MatrixXd joint_angle, Eigen::MatrixXd robot_marker_matrix, Eigen::MatrixXd NDI_matrix)
 {
-	Eigen::VectorXd increment_vector;
 	Eigen::MatrixXd Jagobi_matrix = calculateMultiPointJacobiMatrix(joint_angle);
+	//std::cout << "Jagobi_matrix:" << std::endl;
+	//std::cout << Jagobi_matrix << std::endl;
+	//std::cout << std::endl;
 
 	//计算右边的偏差
 	Eigen::VectorXd marker_loss_vector = calculateMultiPointDifference(robot_marker_matrix, NDI_matrix);
-	increment_vector = (Jagobi_matrix.transpose()*Jagobi_matrix).inverse()*Jagobi_matrix.transpose();
+	//std::cout << "marker_loss_vector:" << std::endl;
+	//std::cout << marker_loss_vector << std::endl;
+	//std::cout << std::endl;
+	Eigen::VectorXd increment_vector = (Jagobi_matrix.transpose()*Jagobi_matrix).inverse()*Jagobi_matrix.transpose()*marker_loss_vector;
 	theta_increment += increment_vector(Eigen::seq(0, 5), Eigen::all);
+	std::cout << "increment_vector:" << std::endl;
+	std::cout << increment_vector << std::endl;
+	std::cout << std::endl;
 	int d_index[4] = { 0, 3, 4, 5 };
 	for (int i = 0; i < 4; i++) {
 		d_increment[d_index[i]] += increment_vector[i + 6];
