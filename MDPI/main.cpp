@@ -75,21 +75,21 @@ int main()
 	}
 
 	Eigen::MatrixXd final_Vob;
-	for (int i = 0; i < 1; i++) {
+	for (int i = 0; i < 20; i++) {
 		//机器人的关节角转换为 n*4*4 的矩阵
 		Eigen::MatrixXd RobotDH_effector_matrix = cal.RobotDHMatrixAndMultiJointAngle(ROBOT_joint_angle_data);
 		//为获得Marker在机器人基座标下的坐标系表示，还需要乘 Vet e: effector t:marker
-		Eigen::MatrixXd robotDH_marker_matrix = RobotDH_effector_matrix * Vet;
+		Eigen::MatrixXd robotDH_marker_matrix = RobotDH_effector_matrix * cal.getVet();
 
 
 		//设置转换矩阵机器人的向量差系数
 		Eigen::VectorXd vector_coefficient(3 * NDI_data_num);
 		vector_coefficient.setOnes();
-		//vector_coefficient = vector_coefficient;
+		vector_coefficient = 0.5 * vector_coefficient;
 		//求解转换矩阵矩阵的偏移项系数
 		Eigen::VectorXd points_coefficient(NDI_data_num);
 		points_coefficient.setOnes();
-		points_coefficient = 0.1 * points_coefficient;
+		//points_coefficient = 0.1 * points_coefficient;
 		//返回的对偶四元数向量 8 * 1
 		Eigen::VectorXd optimal_quaternion(8);
 		cal.optimalTransQuaternion(robotDH_marker_matrix, NDI_matrix,
@@ -108,6 +108,11 @@ int main()
 		//计算各个变量的增量
 		cal.calculateIncrement(ROBOT_joint_angle_data, robotDH_marker_matrix, NDI_matrix);
 	}
+
+	std::cout << "final_Vob:" << std::endl;
+	std::cout << final_Vob << std::endl;
+	std::cout << std::endl;
+
 	Eigen::VectorXd theta_increment = cal.getTheta_increment();
 	std::cout << "theta_increment:" << std::endl;
 	std::cout << theta_increment << std::endl;
@@ -136,9 +141,9 @@ int main()
 		Eigen::Matrix4d result = final_Vob * robotDH_marker_matrix_test.block(4 * i, 0, 4, 4);
 		calculateTool.block(4 * i, 0, 4, 4) = result;
 	}
-	std::cout << "calculateTool:" << std::endl;
-	std::cout << calculateTool << std::endl;
-	std::cout << std::endl;
+	//std::cout << "calculateTool:" << std::endl;
+	//std::cout << calculateTool << std::endl;
+	//std::cout << std::endl;
 
 	Eigen::MatrixXd NDI_data_test;
 	data.readNDIData("..\\x64\\Debug\\calibration_data\\MDPI\\20211215\\test\\NDIData.csv", NDI_data_test);
@@ -146,9 +151,9 @@ int main()
 	int NDI_data_num_test = NDI_data.rows();
 	//NDI参数转换为 n*4*4的矩阵
 	Eigen::MatrixXd NDI_matrix_test = cal.NDIToTransformationMatrix(NDI_data_test);
-	std::cout << "NDI_matrix_test:" << std::endl;
-	std::cout << NDI_matrix_test << std::endl;
-	std::cout << std::endl;
+	//std::cout << "NDI_matrix_test:" << std::endl;
+	//std::cout << NDI_matrix_test << std::endl;
+	//std::cout << std::endl;
 
 	Eigen::MatrixXd loss_matrix = NDI_matrix_test - calculateTool;
 	std::cout << "loss_matrix:" << std::endl;

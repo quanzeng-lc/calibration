@@ -2,7 +2,7 @@
 
 Calibration::Calibration() {
 	point_num = 0;
-	delta = 1e-6;
+	delta = 1e-3;
 	this->DH_list.conservativeResize(6, 4);
 	theta_increment.conservativeResize(6);
 	a_increment.conservativeResize(6);
@@ -10,6 +10,7 @@ Calibration::Calibration() {
 	theta_increment.setZero();
 	a_increment.setZero();
 	d_increment.setZero();
+	Vet_translation_increment.setZero();
 }
 
 void Calibration::set_point_num(int point_num)
@@ -24,6 +25,11 @@ void Calibration::setNorminalDHParam(Eigen::MatrixXd DHParam_list) {
 void Calibration::setVet(Eigen::Matrix4d Vet)
 {
 	this->Vet = Vet;
+}
+
+Eigen::Matrix4d Calibration::getVet()
+{
+	return this->Vet;
 }
 
 void Calibration::setVob(Eigen::Matrix4d Vob)
@@ -470,6 +476,7 @@ Eigen::VectorXd Calibration::matrix2XYZEulerAngle(Eigen::Matrix4d transform_matr
 
 Eigen::MatrixXd Calibration::calculateOnePointJacobiMatrix(Eigen::VectorXd joint_angle) {
 	Eigen::MatrixXd matrix(6, 12);
+	matrix.setZero();
 	//对theta1求偏导数
 	//不加增量得到Marker坐标系在NDI上的表示
 	Eigen::Matrix4d effector_matrix = this->Vob*this->RobotDHMatrixAndJointAngle(joint_angle)*this->Vet;
@@ -479,27 +486,37 @@ Eigen::MatrixXd Calibration::calculateOnePointJacobiMatrix(Eigen::VectorXd joint
 		joint_angle_and_delta[i] += delta;
 		Eigen::Matrix4d effector_matrix_and_delta = this->Vob*this->RobotDHMatrixAndJointAngle(joint_angle_and_delta)*this->Vet;
 		Eigen::VectorXd effectot_coefficient_and_delta = matrix2XYZEulerAngle(effector_matrix_and_delta);
+
 		//计算x y z alpha beta gama 的偏差系数
 		Eigen::VectorXd delta_vector = (effectot_coefficient_and_delta - effectot_coefficient) / delta;
+		//std::cout << "theta"<<i<<"_vector:" << std::endl;
+		//std::cout << delta_vector << std::endl;
+		//std::cout << std::endl;
 		matrix(Eigen::all, Eigen::seq(i, i)) = delta_vector;
 	}
 	
 	int d_index[4] = {0, 3, 4, 5};
 	Eigen::VectorXd d_delta(6);
-	d_delta.setZero();
 	for (int i = 0; i < 4; i++) {
+		//只增加一个参数的值，之前写错了，之前改变的参数值设置为零
+		d_delta.setZero();
 		d_delta[d_index[i]] += delta;
 		Eigen::Matrix4d effector_matrix_and_delta = this->Vob*this->RobotDHMatrixJointAngleAndDParam(joint_angle, d_delta)*this->Vet;
 		Eigen::VectorXd effectot_coefficient_and_delta = matrix2XYZEulerAngle(effector_matrix_and_delta);
 		//计算x y z alpha beta gama 的偏差系数
-		Eigen::VectorXd delta_vector = (effectot_coefficient_and_delta - effectot_coefficient) / delta;
+		Eigen::VectorXd delta_vector = (effectot_coefficient_and_delta - effectot_coefficient);
+		//std::cout << "d_delta_vector" << i << "_vector:" << std::endl;
+		//std::cout << delta_vector << std::endl;
+		//std::cout << std::endl;
+		delta_vector = delta_vector / delta;
 		matrix(Eigen::all, Eigen::seq(i+6, i+6)) = delta_vector;
 	}
 
 	int a_index[2] = {1, 2};
 	Eigen::VectorXd a_delta(6);
-	a_delta.setZero();
 	for (int i = 0; i < 2; i++) {
+		//只增加一个参数的值，之前写错了，之前改变的参数值设置为零
+		a_delta.setZero();
 		a_delta[a_index[i]] += delta;
 		Eigen::Matrix4d effector_matrix_and_delta = this->Vob*this->RobotDHMatrixJointAngleAndAParam(joint_angle, a_delta)*this->Vet;
 		Eigen::VectorXd effectot_coefficient_and_delta = matrix2XYZEulerAngle(effector_matrix_and_delta);
@@ -507,12 +524,32 @@ Eigen::MatrixXd Calibration::calculateOnePointJacobiMatrix(Eigen::VectorXd joint
 		//std::cout << effectot_coefficient_and_delta << std::endl;
 		//std::cout << std::endl;
 		//计算x y z alpha beta gama 的偏差系数
-		Eigen::VectorXd delta_vector = (effectot_coefficient_and_delta - effectot_coefficient) / delta;
-		//std::cout << "delta_vector:" << std::endl;
+		Eigen::VectorXd delta_vector = (effectot_coefficient_and_delta - effectot_coefficient);
+		delta_vector  = delta_vector / delta;
+		//std::cout << "a" << i << "_vector:" << std::endl;
 		//std::cout << delta_vector << std::endl;
 		//std::cout << std::endl;
 		matrix(Eigen::all, Eigen::seq(i + 10, i + 10)) = delta_vector;
 	}
+	////计算Vet的平移向量Jagobi矩阵
+	//Eigen::VectorXd Vet_delta_vector(3);
+	//for (int i = 0; i < 3; i++) {
+	//	Vet_delta_vector.setZero();
+	//	Vet_delta_vector[i] = delta;
+	//	//之前出了问题，还没查清楚 To do...
+	//	Eigen::Matrix4d delta_Vet;
+	//	delta_Vet.setIdentity();
+	//	delta_Vet(Eigen::seq(0, 2), Eigen::seq(3, 3)) += Vet_delta_vector;
+	//	Eigen::Matrix4d effector_matrix_and_delta = this->Vob*this->RobotDHMatrixAndJointAngle(joint_angle)*this->Vet*delta_Vet;
+	//	Eigen::VectorXd effectot_coefficient_and_delta = matrix2XYZEulerAngle(effector_matrix_and_delta);
+	//	//计算x y z alpha beta gama 的偏差系数
+	//	Eigen::VectorXd delta_vector = (effectot_coefficient_and_delta - effectot_coefficient);
+	//	delta_vector = delta_vector / delta;
+	//	matrix(Eigen::all, Eigen::seq(i + 12, i + 12)) = delta_vector;
+	//	//std::cout << "Vet" << i << "_vector:" << std::endl;
+	//	//std::cout << delta_vector << std::endl;
+	//	//std::cout << std::endl;
+	//}
 	return matrix;
 }
 
@@ -543,17 +580,12 @@ Eigen::VectorXd Calibration::calculateMultiPointDifference(Eigen::MatrixXd robot
 		Eigen::Matrix4d cal_NDI_marker = this->Vob*robot_matrix;
 		//转换成 xyz alpha beta gama
 		Eigen::VectorXd cal_xyz_alpha_beta_gama = this->matrix2XYZEulerAngle(cal_NDI_marker);
-		//std::cout << "cal_xyz_alpha_beta_gama:" << std::endl;
-		//std::cout << cal_xyz_alpha_beta_gama << std::endl;
-		//std::cout << std::endl;
 		//取出Marker在NDI的坐标系
 		Eigen::Matrix4d NDI_marker = NDI_matrix(Eigen::seq(4 * i, 4 * i + 3), Eigen::all);
 		Eigen::VectorXd ndi_maker_alpha_beta_gama = this->matrix2XYZEulerAngle(NDI_marker);
-		//std::cout << "ndi_maker_alpha_beta_gama:" << std::endl;
-		//std::cout << ndi_maker_alpha_beta_gama << std::endl;
-		//std::cout << std::endl;
 		//保存他们之间的差
-		difference_vector(Eigen::seq(6 * i, 6 * i + 5), Eigen::all) = ndi_maker_alpha_beta_gama - cal_xyz_alpha_beta_gama;
+		Eigen::MatrixXd subtract = ndi_maker_alpha_beta_gama - cal_xyz_alpha_beta_gama;
+		difference_vector(Eigen::seq(6 * i, 6 * i + 5), Eigen::all) = subtract;
 	}
 	return difference_vector;
 }
@@ -583,5 +615,9 @@ void Calibration::calculateIncrement(Eigen::MatrixXd joint_angle, Eigen::MatrixX
 	for (int i = 0; i < 2; i++) {
 		a_increment[a_index[i]] += increment_vector[i + 10];
 	}
+	//this->Vet.block(0, 3, 3, 1) += increment_vector.block(12, 0, 3, 1);
+	//std::cout << "Vet:" << std::endl;
+	//std::cout << this->Vet << std::endl;
+	//std::cout << std::endl;
 }
 

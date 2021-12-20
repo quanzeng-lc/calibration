@@ -17,6 +17,7 @@ private:
 	Eigen::VectorXd theta_increment;
 	Eigen::VectorXd d_increment;
 	Eigen::VectorXd a_increment;
+	Eigen::VectorXd Vet_translation_increment;
 
 public:
 	Calibration();
@@ -26,6 +27,7 @@ public:
 	void setNorminalDHParam(Eigen::MatrixXd DHParam_list);
 	//将在文件中读取的Marker相对于机器人末端的坐标系保存
 	void setVet(Eigen::Matrix4d Vet);
+	Eigen::Matrix4d getVet();
 	//将计算得到的Vob保存下来
 	void setVob(Eigen::Matrix4d Vob);
 
